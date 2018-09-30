@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8">
+        <style>
+            video {
+                display: none;
+            }
+
+            video, canvas {
+                width: 320px;
+                height: 240px;
+            }
+
+            #can {
+                background: red
+            }
+
+            .bg-img {
+                background: no-repeat url('bg.jpg') !important;
+            }
+        </style>
+    </head>
+    <body>
+        <h4>auto blueback test</h1>
+        <video id="base-video" autoplay></video>
+        <canvas id="cam"></canvas>
+        <canvas id="can"></canvas>
+
+        <div>
+            <label for="color">color picker</label>
+            <input type="color" id="color" name="color" value="#4d5a66" />
+            <br />
+            <label for="sens">sens.</label>
+            <input type="range" id="sens" name="sens" value="15" min="0" max="100" />
+            <br />
+            <label for="moon">I'm in moon.</label>
+            <input type="checkbox" id="moon" name="moon" />
+        </div>
+    
+        <script>
+            const WIDTH = 320
+            const HEIGHT = 240
+
+            const base_video = document.getElementById("base-video")
+            const canvas_video = document.getElementById("cam")
+            const context_video = canvas_video.getContext('2d')
+            const canvas_blueback = document.getElementById("can")
+            const context_blueback = canvas_blueback.getContext('2d')
+            let blueback_image = context_blueback.createImageData(WIDTH, HEIGHT)
+            const picker = document.getElementById("color")
+            const sens = document.getElementById("sens")
+            
+            document.getElementById("moon").addEventListener('change', function() {
+                if(this.checked) {
+                    canvas_blueback.classList.add("bg-img")
+                } else {
+                    canvas_blueback.classList.remove("bg-img")
+                }
+            })
+            
+            let offset, asm, buf
+
+            const init_camera = () => {
+                navigator.mediaDevices.getUserMedia({video: true, audio: false})
+                .then(stream => {
+                    base_video.srcObject = stream;
+                    base_video.onloadedmetadata = e => {
+                        base_video.play()
+                        context_video.scale(1, base_video.videoHeight/base_video.videoWidth)
+                        init_wasm()
+                    }
+                }).catch(error => {
+                    throw error
+                })
+            }
+
+            const init_wasm = () => {
+                // fetch('target/wasm32-unknown-unknown/debug/fkj_blueback.wasm')
+                fetch('fkj_blueback.min.wasm')
+                .then(response => response.arrayBuffer())
+                .then(bytes => WebAssembly.instantiate(bytes, {}))
+                .then(results => {
+                    asm = results.instance.exports
+                    offset = asm.alloc_pixels(WIDTH * HEIGHT)
+
+                    //  バッファの初期化
+                    buf = new Uint8ClampedArray(asm.memory.buffer, offset, WIDTH*HEIGHT*4)
+
+                    render()
+                })
+            }
+
+            const render = () => {
+                //  カメラをcanvasへコピー
+                context_video.drawImage(base_video, 0, 0, base_video.videoWidth, base_video.videoHeight, 0, 0,  WIDTH, HEIGHT)
+
+                //  ビデオ(キャンバス）からコピー
+                buf.set(new Uint8ClampedArray(context_video.getImageData(0, 0, WIDTH, HEIGHT).data.buffer))
+
+                //  処理
+                let rgb = picker.value.match(/#(.{2})(.{2})(.{2})/)
+                let a = asm.paint_red(offset, WIDTH, HEIGHT, rgb[1], rgb[2], rgb[3], sens.value)
+
+                //  結果表示
+                blueback_image.data.set(buf)
+                context_blueback.putImageData(blueback_image, 0, 0)
+
+                requestAnimationFrame(render)
+            }            
+
+            init_camera()
+        </script>
+    </body>
+</html>

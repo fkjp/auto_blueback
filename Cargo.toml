@@ -1,0 +1,7 @@
+[lib]
+crate-type = ["cdylib"]
+
+[package]
+name = "fkj_blueback"
+version = "0.1.0"
+authors = ["fkj <fkjpn0@gmail.com>"]
