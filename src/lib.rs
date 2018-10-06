@@ -12,7 +12,7 @@ pub fn alloc_pixels(size: usize) -> i32 {
 }
 
 #[no_mangle]
-pub fn paint_red(ptr: i32, width: usize, height: usize, r: u8, g: u8, b: u8, sens: f32) {
+pub fn paint_red(ptr: i32, width: usize, height: usize, r: u8, g: u8, b: u8, sens: f32, invt: bool) {
     let pixels = unsafe { slice::from_raw_parts_mut(ptr as *mut Pixel, width * height) };
 
     // pixels.into_par_iter().for_each(|pixel| {
@@ -20,8 +20,14 @@ pub fn paint_red(ptr: i32, width: usize, height: usize, r: u8, g: u8, b: u8, sen
         //  比較する色
         let diff = pixel.diff([r, g, b]);
 
-        if diff < sens {
-            pixel.set_alpha(0);
+        if !invt {
+            if diff < sens {
+                pixel.set_alpha(0);
+            }
+        } else {
+            if diff > sens {
+                pixel.set_alpha(0);
+            }
         }
     }
 }
